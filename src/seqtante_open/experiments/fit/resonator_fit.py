@@ -29,51 +29,66 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
+import qililab as ql
 import xarray as xr
-from qilitools.plotting import auto_plot, convert_plot_units, get_xarray_from_meas, rotated_IQ_divide_by_median_col
 from scipy.signal import find_peaks, savgol_filter
 from tqdm.auto import tqdm
 
+from seqtante_open.experiments.fit import FittingClass
+from seqtante_open.experiments.plotting import (
+    auto_plot,
+    convert_plot_units,
+    get_xarray_from_meas,
+    rotated_IQ_divide_by_median_col,
+)
 from seqtante_open.experiments.utils import lorentzian_fit_custom
 
 
-class ResonatorSpectroscopyFit:
+class ResonatorSpectroscopyFit(FittingClass):
     """Handle the correction of the data and fitting
     of Resonator Spectroscopy data.
     """
 
     def __init__(
-        self, qubit_idx: int,
-        measurement: np.ndarray,
+        self,
+        qubit_idx: int,
+        measurement_id: int,
         path: str | None = None
     ):
         """Initialize the class
 
         Args:
-            qubit_idx (int): qubit index
-            measurement (): array with the measurement result
-            path (str | None): path to save plots
+            qubit_idx (int): qubit index.
+            measurement_id (int): id of the experiment in the database.
+            path (str | None): path to save plots.
         """
-        self.qubit_idx = qubit_idx
-        self.measurement = measurement
-        self.path = path
+        super().__init__(measurement_id=measurement_id, target=qubit_idx, path=path)
+        calibration = ql.deserialize(self.measurement.calibration)
+        parameters: dict = calibration.parameters
+
+        self.data_folder = parameters["data_folder"]
+        self.peak_axis: int | str = parameters["peak_axis"]
+        self.filter_on: bool = parameters.get("filter_on", False)
+        self.filter_window_length: int = parameters.get("filter_window_length", 21)
+        self.filter_polyorder: int = parameters.get("filter_polyorder", 3)
+        self.fit_lorentzian = parameters.get("fit_lorentzian", False)
+        self.dataprocessing = np.abs if parameters["dataprocessing"] == "absolute" else rotated_IQ_divide_by_median_col
+
+        self.x_axis: str = parameters["x_axis"]
+
         self.readout_if_list = None
 
     def _find_peaks_from_arrays(self,
                                 data: np.ndarray,
                                 x_vals: np.ndarray,
-                                filter_on: bool = False,
-                                filter_window_length: int = 21,
-                                filter_polyorder: int = 3,
-                                fit_lorentzian: bool = False,
                                 ):
         """Find peaks in a 2D array (num_traces, trace_length)"""
         peak_indices = []
         fitted_ifs = []
 
         for y in tqdm(data):
-            if filter_on and len(y) >= filter_window_length:
-                y_smooth = savgol_filter(y, window_length=filter_window_length, polyorder=filter_polyorder)
+            if self.filter_on and len(y) >= self.filter_window_length:
+                y_smooth = savgol_filter(y, window_length=self.filter_window_length, polyorder=self.filter_polyorder)
             else:
                 y_smooth = y
 
@@ -85,7 +100,7 @@ class ResonatorSpectroscopyFit:
 
             peak_indices.append(best_peak_index)
 
-            if fit_lorentzian:
+            if self.fit_lorentzian:
                 fitted_if, _, _ = lorentzian_fit_custom(
                     y_values=y_smooth,
                     x_values=x_vals,
@@ -93,27 +108,20 @@ class ResonatorSpectroscopyFit:
                 )
                 fitted_ifs.append(fitted_if)
 
-        if fit_lorentzian:
+        if self.fit_lorentzian:
             return np.array(fitted_ifs)
         return x_vals[np.array(peak_indices)]
 
-    def fit(self,
-            peak_axis: int | str,
-            filter_on: bool = False,
-            filter_window_length: int = 21,
-            filter_polyorder: int = 3,
-            fit_lorentzian: bool = False,
-            dataprocessing=rotated_IQ_divide_by_median_col
-            ):
+    def fit(self):
         xarr = get_xarray_from_meas(self.measurement)
         xarr = convert_plot_units(xarr)
-        xarr = xr.apply_ufunc(dataprocessing, xarr.T)
+        xarr = xr.apply_ufunc(self.dataprocessing, xarr.T)
 
         # Determine axis name
-        if isinstance(peak_axis, str):
-            axis_name = peak_axis
-        elif isinstance(peak_axis, int):
-            axis_name = xarr.dims[peak_axis]
+        if isinstance(self.peak_axis, str):
+            axis_name = self.peak_axis
+        elif isinstance(self.peak_axis, int):
+            axis_name = xarr.dims[self.peak_axis]
         else:
             raise ValueError("peak_axis must be int or str")
 
@@ -124,15 +132,11 @@ class ResonatorSpectroscopyFit:
         self.readout_if_list = self._find_peaks_from_arrays(
             data=data,
             x_vals=x_vals,
-            filter_on=filter_on,
-            filter_window_length=filter_window_length,
-            filter_polyorder=filter_polyorder,
-            fit_lorentzian=fit_lorentzian,
         )
 
-    def plot(self, x_axis: str):
+    def plot(self):
         title = "Resonator vs Flux"
-        fig = auto_plot(self.measurement, x=x_axis)
+        fig = auto_plot(self.measurement, x=self.x_axis)
         _, loops = self.measurement.load_old_h5()
         x_flux = loops["flux"]["array"]
 
@@ -141,8 +145,8 @@ class ResonatorSpectroscopyFit:
             y=self.readout_if_list,
             mode="markers+lines",
             name="Peak IF freq",
-            marker=dict(color="red", size=6),
-            line=dict(dash="dot", color="red"),
+            marker={"color": "red", "size": 6},
+            line={"dash": "dot", "color": "red"},
         ))
 
         if self.path:

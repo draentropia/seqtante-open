@@ -14,18 +14,19 @@
 
 import numpy as np
 import tqdm
-from qililab import Platform, get_db_manager
+from qililab import Platform
 from qililab.result import StreamArray
 
 from seqtante_open.experiments.fit import ResonatorSpectroscopyFit
 from seqtante_open.experiments.qprogram import resonator_spectroscopy_cw
-from seqtante_open.experiments.utils import set_all_flux_channels_to_zero
+from seqtante_open.experiments.utils import from_parameters_to_calibration, set_all_flux_channels_to_zero
+from seqtante_open.outputs import output_controller
 
 SAMPLE_NUMBER = 3.7
 
 
 def single_tone_frequency_vs_flux_cw_dc(platform_path: str, platform: Platform, parameters: dict):
-    db_manager = get_db_manager()
+    db_manager = output_controller.db_manager
     qubit_idx = parameters["targets"]
     readout_bus = parameters["readout_bus"]
     if_sweep = np.linspace(*parameters["frequency_sweep_values"])
@@ -63,6 +64,8 @@ def single_tone_frequency_vs_flux_cw_dc(platform_path: str, platform: Platform, 
         },
         platform=platform,
         experiment_name="single_tone__frequency_vs_flux_cw_dc",
+        autocalibration=True,
+        calibration=from_parameters_to_calibration(parameters),
         db_manager=db_manager,
         qprogram=qprogram,
     )
@@ -80,23 +83,9 @@ def single_tone_frequency_vs_flux_cw_dc(platform_path: str, platform: Platform, 
 
     meas = db_manager.load_by_id(exp_id)
     data_folder = parameters["data_folder"]
-    x_axis = parameters["x_axis"]
-    peak_axis = parameters["peak_axis"]
-    filter_on = parameters["filter_on"]
-    filter_window_length = parameters["filter_window_length"]
-    filter_polyorder = parameters["filter_polyorder"]
-    fit_lorentzian = parameters["fit_lorentzian"]
-    dataprocessing = np.abs if parameters["dataprocessing"] == "absolute" else None
     resonator_model = ResonatorSpectroscopyFit(qubit_idx=qubit_idx, measurement=meas, path=data_folder)
-    resonator_model.fit(
-        peak_axis=peak_axis,
-        filter_on=filter_on,
-        filter_window_length=filter_window_length,
-        filter_polyorder=filter_polyorder,
-        fit_lorentzian=fit_lorentzian,
-        dataprocessing=dataprocessing,
-    )
-    resonator_model.plot(x_axis=x_axis)
+    resonator_model.fit()
+    resonator_model.plot()
 
     return {
         "readout_if_list": resonator_model.readout_if_list,

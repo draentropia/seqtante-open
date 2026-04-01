@@ -16,13 +16,16 @@ import numpy as np
 import qcodes as qc
 import qililab as ql
 from qililab.platform.platform import Platform
-from qilitools.analysis import XTalk
+
+from seqtante_open.experiments.analysis import XTalk
+
 
 def generate_voltage_param(qdac_channel, param_name):
     setter = qdac_channel.dc_constant_V
     getter = qdac_channel.dc_constant_V
 
-    return qc.Parameter(name = param_name, label = param_name, set_cmd=setter, get_cmd=getter, unit = "V")
+    return qc.Parameter(name=param_name, label=param_name, set_cmd=setter, get_cmd=getter, unit="V")
+
 
 def qdac_flux_channels_setup(platform_path: str, platform: Platform, parameters: dict):
     voltage_source_alias = parameters['voltage_source_alias']

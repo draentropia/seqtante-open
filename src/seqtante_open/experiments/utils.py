@@ -12,11 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import qcodes as qc
 import lmfit
 import numpy as np
-from qilitools.analysis.lorentzian_fit import lorentzian
+import qcodes as qc
 from qililab.instruments.voltage_source import VoltageSource
+from qililab import Calibration
+
+from seqtante_open.experiments.analysis.lorentzian_fit import lorentzian
+
+
+def from_parameters_to_calibration(parameters: dict[str, Any], targets: list[str] | None = None):
+
+    if not targets:
+        calibration = Calibration()
+        calibration.parameters = parameters
+        return calibration
+
+    calibration_dict = {}
+    for target in targets:
+        calibration_dict[target] = Calibration()
+        calibration_dict[target].parameters = {**{key: value for key, value in parameters.items() if isinstance(key, str)}, **parameters[target]}
+    return calibration_dict
 
 
 def generate_qdac_voltage_param(qdac_channel, param_name):
