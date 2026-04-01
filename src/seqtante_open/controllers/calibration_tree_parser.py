@@ -19,8 +19,8 @@ from typing import Any
 from loguru import logger
 from qililab import Platform
 
-from seqtante.controllers import CalibrationGraph, CalibrationNode
-from seqtante.outputs import output_controller
+from seqtante_open.controllers import CalibrationGraph, CalibrationNode
+from seqtante_open.outputs import output_controller
 
 
 class CalibrationParser:

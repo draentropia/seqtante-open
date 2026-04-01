@@ -20,8 +20,8 @@ from qililab.result import DatabaseManager, StreamArray
 from qililab.waveforms import Arbitrary
 from tqdm.auto import tqdm
 
-from seqtante.experiments.fluxoniums.analysis import XTalk
-from seqtante.experiments.fluxoniums.analysis.analysis import compensate_round
+from seqtante_open.experiments.fluxoniums.analysis import XTalk
+from seqtante_open.experiments.fluxoniums.analysis.analysis import compensate_round
 from qilitools.qprogram import (
     rabi_amplitude_gaussian,
     rabi_single_gaussian_ac,

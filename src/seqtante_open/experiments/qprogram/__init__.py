@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from .spectroscopy import resonator_spectroscopy_cw
 
-from .fit_base import FittingClass
-from .utils import cosfunc
-
-__all__ = ["FittingClass", "cosfunc"]
+__all__ = ["resonator_spectroscopy_cw"]

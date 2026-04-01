@@ -16,11 +16,11 @@ from typing import Any
 import numpy as np
 import qililab as ql
 from qililab import Parameter, Platform
-from seqtante.experiments.fluxoniums.experiment_classes import rabi__amplitude_gaussian_hw_loop
+from seqtante_open.experiments.experiment_classes import rabi__amplitude_gaussian_hw_loop
 from qilitools.experiments.utils import get_gate_params
 
-from seqtante.experiments.utils import from_parameters_to_calibration
-from seqtante.outputs import output_controller
+from seqtante_open.experiments.utils import from_parameters_to_calibration
+from seqtante_open.outputs import output_controller
 
 from .fit import RabiFit
 

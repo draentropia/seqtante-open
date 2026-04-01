@@ -22,8 +22,8 @@ from loguru import logger
 from qcodes.utils.deprecate import QCoDeSDeprecationWarning
 from ruamel.yaml import YAML
 
-from seqtante.controllers import CalibrationGraph, CalibrationParser
-from seqtante.outputs import output_controller
+from seqtante_open.controllers import CalibrationGraph, CalibrationParser
+from seqtante_open.outputs import output_controller
 
 warnings.filterwarnings("ignore", category=QCoDeSDeprecationWarning)
 warnings.filterwarnings("ignore", message="Using UFloat objects with std_dev==0*")

@@ -18,12 +18,10 @@ import qcodes as qc
 from qililab import Parameter
 from qililab.platform import Platform
 from qililab.result import DatabaseManager, StreamArray
+from seqtante_open.experiments.fluxonium.analysis import sss_from_array
+from seqtante_open.experiments.fluxonium.qprogram import resonator_spectroscopy_cw
 from tqdm.auto import tqdm
 
-from seqtante.experiments.fluxonium.analysis import sss_from_array
-from seqtante.experiments.fluxonium.qprogram import (
-    resonator_spectroscopy_cw,
-)
 
 def single_tone_frequency_vs_flux_cw_dc(
     platform: Platform,

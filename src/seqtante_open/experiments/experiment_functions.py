@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from seqtante.experiments.fluxoniums import qdac_flux_channels_setup, single_tone_frequency_vs_flux_cw_dc, two_tone_frequency_vs_flux_pulsed_dc_update_freq
+from seqtante_open.experiments import qdac_flux_channels_setup, single_tone_frequency_vs_flux_cw_dc, two_tone_frequency_vs_flux_pulsed_dc_update_freq
 
 experiment_functions_dict = {
     "qdac_flux_channels_setup": qdac_flux_channels_setup,

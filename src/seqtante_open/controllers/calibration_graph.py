@@ -18,7 +18,7 @@ import networkx as nx
 from loguru import logger
 
 if TYPE_CHECKING:
-    from seqtante.controllers.calibration_node import CalibrationNode
+    from seqtante_open.controllers.calibration_node import CalibrationNode
 
 
 class CalibrationGraph:
@@ -46,12 +46,18 @@ class CalibrationGraph:
 
     def run_calibration(self):
         """Runs all the nodes in order and interupts faulty calibrations"""
+        prev_node = None
         for node_idx in nx.topological_sort(self.graph):
             node = self.graph.nodes[node_idx]["data"]
+            if prev_node:
+                node.add_prev_results(prev_node.results)
 
             dead_targets = node.run(self.dead_targets)
 
             if dead_targets:
                 self.dead_targets.update(dict.fromkeys(dead_targets, node.name))
+
+            prev_node = node
+
         for target, node_name in self.dead_targets.items():
             logger.opt(colors=True).info("Exception triggered for <r>{target}</r> in node <i><fg #8838ff>{node_name}</></i>", target=target, node_name=node_name)

@@ -19,8 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from lmfit import Model
 from scipy.special import erf as _erf
-
-from seqtante.outputs import output_controller
+from seqtante_open.outputs import output_controller
 
 
 class FittingClass(ABC):

@@ -43,7 +43,7 @@ def qdac_flux_channels_setup(platform_path: str, platform: Platform, parameters:
     flux_x_name = xtalk_params['flux_x']['name']
     flux_x_dac = xtalk_params['flux_x']['dac']
     flux_x_offset = xtalk_params['flux_x']['offset']
-    
+
     flux_z_channel = qdac.device.channel(flux_z_dac)
     flux_x_channel = qdac.device.channel(flux_x_dac)
 

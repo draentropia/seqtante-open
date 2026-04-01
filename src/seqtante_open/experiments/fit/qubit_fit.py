@@ -33,7 +33,7 @@ import xarray as xr
 from scipy.signal import find_peaks
 from scipy.signal import find_peaks, savgol_filter
 from qilitools.plotting import auto_plot, center_phase_around_median
-from seqtante.experiments.fluxoniums.utils import lorentzian_fit_custom
+from seqtante_open.experiments.utils import lorentzian_fit_custom
 
 
 class QubitSpectroscopyFit:

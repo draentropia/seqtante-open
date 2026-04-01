@@ -13,28 +13,23 @@
 # limitations under the License.
 
 import numpy as np
-import qcodes as qc
-import qililab as ql
 import tqdm
-from qililab import Platform
-from qilitools.analysis import XTalk, array_from_center_span_npoints
-from seqtante.experiments.fluxoniums.experiment_classes.offset_calibration import single_tone_frequency_vs_flux_cw_dc as single_tone_frequency_flux_experiment
-from tqdm.auto import tqdm
+from qililab import Platform, get_db_manager
+from qililab.result import StreamArray
 
-from seqtante.experiments.fluxoniums.fit.resonator_fit import ResonatorSpectroscopyFit
-from seqtante.experiments.fluxoniums.utils import set_all_flux_channels_to_zero
+from seqtante_open.experiments.fit import ResonatorSpectroscopyFit
+from seqtante_open.experiments.qprogram import resonator_spectroscopy_cw
+from seqtante_open.experiments.utils import set_all_flux_channels_to_zero
+
+SAMPLE_NUMBER = 3.7
 
 
 def single_tone_frequency_vs_flux_cw_dc(platform_path: str, platform: Platform, parameters: dict):
-    SAMPLE_NUMBER = 3.7
-    db_manager = ql.get_db_manager()
-    db_manager.set_sample_and_cooldown(sample=f"ConscienceWF02-{SAMPLE_NUMBER}", cooldown="CD79-Mimas")
-    qubit_idx = parameters["qubit_idx"]
+    db_manager = get_db_manager()
+    qubit_idx = parameters["targets"]
     readout_bus = parameters["readout_bus"]
-    if_sweep_params = parameters["frequency_sweep_values"]
-    if_sweep = np.linspace(if_sweep_params[0], if_sweep_params[1], if_sweep_params[2])
-    flux_sweep_params = parameters["flux_sweep_values"]
-    flux_sweep = array_from_center_span_npoints(flux_sweep_params[0], flux_sweep_params[1], flux_sweep_params[2])
+    if_sweep = np.linspace(*parameters["frequency_sweep_values"])
+    flux_sweep = np.linspace(*parameters["flux_sweep_values"])
     flux_parameter_id = parameters["flux_parameter_id"]
     xtalk_bot = parameters.get("xtalk_bot")
     voltage_source = parameters.get("voltage_source")
@@ -45,17 +40,42 @@ def single_tone_frequency_vs_flux_cw_dc(platform_path: str, platform: Platform, 
     duration = parameters["repetition_duration"]
 
     set_all_flux_channels_to_zero(voltage_source)
-    exp_id = single_tone_frequency_vs_flux_cw_dc(platform=platform,
-        db_manager=db_manager,
-        readout_bus=readout_bus,
-        if_sweep=if_sweep,
-        amplitude=0.1,
+
+    qprogram = resonator_spectroscopy_cw(
+        if_sweep[0],
+        if_sweep[-1],
+        if_sweep[1] - if_sweep[0],
         averages=averages,
-        duration=duration,
-        optional_identifier="",
-        flux_parameter=flux_parameter,
-        flux_sweep=np.linspace(-1, 1, 1001),
+        integration_time=duration,
+        r_amp=0.1,
     )
+
+    stream_array = StreamArray(
+        shape=(len(flux_sweep), len(if_sweep), 2),
+        loops={
+            "flux": {
+                "array": flux_sweep,
+                "units": flux_parameter.unit,
+                "bus": flux_parameter.label,
+                "parameter": "Flux",
+            },
+            "frequency": {"array": if_sweep, "units": "Hz", "bus": readout_bus, "parameter": "IF_frequency"},
+        },
+        platform=platform,
+        experiment_name="single_tone__frequency_vs_flux_cw_dc",
+        db_manager=db_manager,
+        qprogram=qprogram,
+    )
+
+    with stream_array:
+        for ii, v in enumerate(tqdm(flux_sweep)):
+            flux_parameter(v)
+            results = platform.execute_qprogram(qprogram, bus_mapping={"readout": readout_bus}).results
+
+            stream_array[ii,] = results[readout_bus][0].array.T
+
+    exp_id = stream_array.measurement.measurement_id
+
     set_all_flux_channels_to_zero(voltage_source)
 
     meas = db_manager.load_by_id(exp_id)

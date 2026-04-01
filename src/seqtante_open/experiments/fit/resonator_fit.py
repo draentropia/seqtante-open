@@ -24,16 +24,17 @@ Functions:
     fit: fit the resonator spectroscopy data.
     plot: plot the fitted resonator spectroscopy data.
 """
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 import plotly.graph_objects as go
-from tqdm.auto import tqdm
 import xarray as xr
-from scipy.signal import find_peaks
-from scipy.signal import find_peaks, savgol_filter
 from qilitools.plotting import auto_plot, convert_plot_units, get_xarray_from_meas, rotated_IQ_divide_by_median_col
-from seqtante.experiments.fluxoniums.utils import lorentzian_fit_custom
+from scipy.signal import find_peaks, savgol_filter
+from tqdm.auto import tqdm
+
+from seqtante_open.experiments.utils import lorentzian_fit_custom
 
 
 class ResonatorSpectroscopyFit:
@@ -94,8 +95,7 @@ class ResonatorSpectroscopyFit:
 
         if fit_lorentzian:
             return np.array(fitted_ifs)
-        else:
-            return x_vals[np.array(peak_indices)]
+        return x_vals[np.array(peak_indices)]
 
     def fit(self,
             peak_axis: int | str,

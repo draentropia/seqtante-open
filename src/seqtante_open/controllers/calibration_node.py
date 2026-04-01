@@ -19,8 +19,7 @@ from typing import Any, Dict
 
 from loguru import logger
 from qililab import Platform
-
-from seqtante.experiments.experiment_functions import double_qubit_exp, experiment_functions_dict, single_qubit_exp
+from seqtante_open.experiments.experiment_functions import double_qubit_exp, experiment_functions_dict, single_qubit_exp
 
 
 class CalibrationNode:
@@ -57,7 +56,7 @@ class CalibrationNode:
         self.experiment_func = experiment_functions_dict.get(experiment, None)  # Callable(platform, platform_path, parameters) -> Any
         self.parameters: Dict[tuple | str | int, Any] = copy(parameters)
 
-        if isinstance(simultaneous, list):
+        if isinstance(simultaneous, list) and False:  # TODO: support parallelization in fluxonium experiments in the future if possible
             if all(isinstance(sim, list) for sim in simultaneous):
                 self.simultaneous = [[self._to_valid_target(target) for target in sim] for sim in simultaneous]
                 unexpected_sim_targets = {st for sim in simultaneous for st in sim if st not in targets}
@@ -68,7 +67,7 @@ class CalibrationNode:
                 logger.opt(colors=True).warning("Invalid type for simultaneous on node <r>{node}</r>. Simultaneous has to be a list of lists of targets. "
                 "(Running node without parallelization)", node=self.name)
                 self.simultaneous = False
-        elif simultaneous:
+        elif simultaneous and False:
             self.simultaneous = [self.targets]
         else:
             self.simultaneous = []
@@ -90,6 +89,13 @@ class CalibrationNode:
         vk = self._to_valid_target(key)
         if vk in self.parameters:
             del self.parameters[vk]
+
+    def add_prev_results(self, results: dict[int | tuple, dict]):
+        for target, res in results.items():
+            if target in self.parameters:
+                self.parameters[target].update(res)
+                continue
+            self.parameters[target] = res
 
     @staticmethod
     def _to_valid_target(key):
@@ -174,7 +180,8 @@ class CalibrationNode:
                 parameters=parameters,
                 )
             if isinstance(result, dict):
-                self.result = self.result.update(result)
+                for target in targets:
+                    self.result[target] = result
         except Exception as e:
             logger.opt(exception=True).warning(str(e.__class__.__name__) + " " + str(e))
             logger.opt(colors=True).warning("Skipping calibration of target/s <r>{target}</>", target=targets)

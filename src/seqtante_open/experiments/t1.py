@@ -11,19 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Any
 
 import numpy as np
-from qililab import Parameter, save_platform
+from qililab import Parameter
 from qililab.platform.platform import Platform
-from qilitools.experiments.two_tone import two_tone__frequency_d_drag
+from qilitools.experiments import t1_hardware_loop
 from qilitools.experiments.utils import get_gate_params
 
-from seqtante.experiments.utils import from_parameters_to_calibration
-from seqtante.outputs import output_controller
+from seqtante_open.experiments.utils import from_parameters_to_calibration
+from seqtante_open.outputs import output_controller
 
-from .fit import TwoToneFit
+from .fit import T1Fit
 
 _DEFAULTS = {
     "averages": 2000,
@@ -31,16 +30,16 @@ _DEFAULTS = {
 }
 
 
-def two_tone_ex(platform: Platform, platform_path: str, parameters: dict[str, Any]):
+def t1_ex(platform: Platform, platform_path: str, parameters: dict[str, Any]):
     qubits = parameters["targets"]
     db_manager = output_controller.db_manager
-    ex_p = get_gate_params(platform, qubits, **{"drive_q{}_bus": [Parameter.IF, Parameter.LO_FREQUENCY]})
+    ex_p = get_gate_params(platform, qubits)
     for qubit in qubits:
         ex_p[qubit].update(parameters[qubit])
-        ex_p[qubit]["freq_sweep"] = np.arange(*parameters[qubit].get("freq_sweep", parameters["freq_sweep"]))\
-                                        + ex_p[qubit]["intermediate_frequency"]
+        if "wait_sweep" in ex_p[qubit]:
+            ex_p[qubit]["t1_time_sweep"] = np.linspace(*parameters[qubit].get("wait_sweep"))
 
-    measurement_ids = two_tone__frequency_d_drag(
+    measurement_ids = t1_hardware_loop(
         platform=platform,
         db_manager=db_manager,
         parameters=ex_p,
@@ -49,24 +48,14 @@ def two_tone_ex(platform: Platform, platform_path: str, parameters: dict[str, An
         autocalibration=True,
         averages=parameters.get("averages", _DEFAULTS["averages"]),
         relax_duration=parameters.get("relax_duration", _DEFAULTS["relax_duration"]),
-    )
-
+        t1_time_sweep=np.linspace(*parameters["wait_sweep"])
+        )
     for qubit, measurement_id in zip(qubits, measurement_ids):
 
-        two_tone_model = TwoToneFit(
+        t1_model = T1Fit(
             qubit_idx=qubit,
             measurement_id=measurement_id,
-            lo=ex_p[qubit]["frequency"],
             path=parameters[qubit]["data_folder"]
         )
-        two_tone_model.fit()
-        two_tone_model.plot()
-        i_r_squared = two_tone_model.results["r_squared"][0]
-        q_r_squared = two_tone_model.results["r_squared"][1]
-        if i_r_squared > q_r_squared:
-            fitted_if = two_tone_model.results["fitted_ifs"][0]
-        else:
-            fitted_if = two_tone_model.results["fitted_ifs"][1]
-        platform.set_parameter(alias=ex_p[qubit]["bus_mapping"]["drive"], parameter=Parameter.IF, value=fitted_if)
-    save_platform(platform_path, platform)
-    db_manager.update_platform(platform)
+        t1_model.fit()
+        t1_model.plot()
