@@ -28,6 +28,8 @@ SAMPLE_NUMBER = 3.7
 def single_tone_frequency_vs_flux_cw_dc(platform_path: str, platform: Platform, parameters: dict):
     db_manager = output_controller.db_manager
     qubit_idx = parameters["targets"]
+    parameters = parameters.copy()
+    parameters.update(parameters[qubit_idx])
     readout_bus = parameters["readout_bus"]
     if_sweep = np.linspace(*parameters["frequency_sweep_values"])
     flux_sweep = np.linspace(*parameters["flux_sweep_values"])
