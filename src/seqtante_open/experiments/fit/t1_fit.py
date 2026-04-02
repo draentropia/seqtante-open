@@ -26,14 +26,16 @@ Functions:
 """
 import os
 
+import lmfit
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 import qililab as ql
 import xarray as xr
-from scipy.signal import find_peaks, savgol_filter
+from scipy.signal import find_peaks
+from sklearn.metrics import r2_score
 from tqdm.auto import tqdm
-
+import scipy.optimize as sp
 from seqtante_open.experiments.fit import FittingClass
 from seqtante_open.experiments.plotting import (
     auto_plot,
@@ -42,12 +44,12 @@ from seqtante_open.experiments.plotting import (
     get_xarray_from_meas,
 )
 from seqtante_open.experiments.analysis import rotate_iq
-from seqtante_open.experiments.analysis import lorentzian
+from seqtante_open.experiments.fit.utils import decaying_exponential
 
 
-class QubitSpectroscopyFit:
+class T1Fit:
     """Handle the correction of the data and fitting
-    of Qubit Spectroscopy data.
+    of T1 data.
     """
 
     def __init__(
@@ -68,45 +70,27 @@ class QubitSpectroscopyFit:
         self.measurement = measurement
         self.loop = loop
         self.path = path
-        self.qubit_freq = None
+        self.drive_amp = None
 
-    def _find_qubit_freq(self,
+    def _find_t1_coherence(self,
                         data: np.ndarray,
                         x_vals: np.ndarray,
                         ):
-        """Find qubit frequency in a 2D array"""
-        if_sweep = self.loop["frequency"]["array"]
-        flux_sweep = self.loop["flux"]["array"]
-        fitted_ifs = np.empty((len(flux_sweep)))
-        r_squareds = np.empty((len(flux_sweep)))
-        i = data[:,:,0]
-        q = data[:,:,1]
+        """Find drive amplitude in a 1D array"""
+        wait_sweep = self.loop["time"]["array"]
+        i = data[:,0]
+        q = data[:,1]
         rotated_signal = rotate_iq(i + 1j * q)
         signal = np.real(rotated_signal)
         
-        fit_values = np.empty((len(x_vals), len(if_sweep)))
-        fitted_ifs = np.empty((len(x_vals)))
-        r_squareds = np.empty((len(x_vals)))
-        mask_i = np.empty(len(x_vals), dtype=bool)
+        initial_guess = [1, 8_000, 0]  # initial guess for the parameters
 
+        optimized_params_1, _ = sp.curve_fit(
+            decaying_exponential, wait_sweep, signal, p0=initial_guess
+        )
+        t1_fitted = optimized_params_1[1]/1000
 
-        for ii in range(len(x_vals)):
-            i_fitted_if, i_fitvals, i_rsquared = lorentzian(np.real(signal[ii]), if_sweep)
-
-            if i_rsquared < 0.60:
-                i_fitted_if = np.nan
-                mask_i[ii] = False
-            else:
-                mask_i[ii] = True
-            
-            fitted_ifs[ii] = i_fitted_if
-            fit_values[ii] = i_fitvals
-            r_squareds[ii] = i_rsquared
-
-        i_coeffs = np.polyfit(flux_sweep[mask_i], fitted_ifs[:][mask_i], 2)
-        i_sweetspot = -i_coeffs[1]/(2*i_coeffs[0])
-
-        return i_sweetspot
+        return t1_fitted
 
     def fit(self):
         """Empty placeholder for now"""
@@ -126,7 +110,7 @@ class QubitSpectroscopyFit:
         data = xarr.transpose(..., axis_name).to_numpy()
         x_vals = xarr[axis_name].to_numpy()
 
-        self.qubit_if = self._find_qubit_freq(
+        self.drive_amp = self._find_t1_coherence(
             data=data,
             x_vals=x_vals,
         )

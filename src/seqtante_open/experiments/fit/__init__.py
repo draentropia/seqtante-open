@@ -15,6 +15,15 @@
 from .fit_base import FittingClass
 from .qubit_fit import QubitSpectroscopyFit
 from .resonator_fit import ResonatorSpectroscopyFit
-from .utils import cosfunc
+from .utils import cosfunc, cosine, decaying_exponential, find_peaks_poly, sinus
 
-__all__ = ["FittingClass", "QubitSpectroscopyFit", "ResonatorSpectroscopyFit", "cosfunc"]
+__all__ = [
+    "FittingClass",
+    "QubitSpectroscopyFit",
+    "ResonatorSpectroscopyFit",
+    "cosfunc",
+    "cosine",
+    "decaying_exponential",
+    "find_peaks_poly",
+    "sinus"
+    ]

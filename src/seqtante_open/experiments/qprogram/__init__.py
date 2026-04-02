@@ -13,5 +13,7 @@
 # limitations under the License.
 from .spectroscopy import resonator_spectroscopy_cw
 from .qubit_spectroscopy import two_tone_spectroscopy
+from .rabi import rabi_amp_square_drive
+from .t1 import t1_single_square
 
-__all__ = ["resonator_spectroscopy_cw", "two_tone_spectroscopy"]
+__all__ = ["resonator_spectroscopy_cw", "rabi_amp_square_drive", "two_tone_spectroscopy", "t1_single_square"]

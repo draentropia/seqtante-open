@@ -26,6 +26,9 @@ from xarray import DataArray
 
 # kaleido_get_chrome #NOTE look into if this code can be run without running this command. Potentially by using an earlier version.
 
+def center_phase_around_median(S21):
+    centered = np.apply_along_axis(subtract_median, axis=0, arr=phase(S21))
+    return ((centered + np.pi) % (2 * np.pi)) - np.pi
 
 def get_xarray_from_meas(measurement: Measurement):
     results, loops = measurement.load_old_h5()

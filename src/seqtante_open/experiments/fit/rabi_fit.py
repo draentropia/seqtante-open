@@ -26,12 +26,14 @@ Functions:
 """
 import os
 
+import lmfit
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 import qililab as ql
 import xarray as xr
-from scipy.signal import find_peaks, savgol_filter
+from scipy.signal import find_peaks
+from sklearn.metrics import r2_score
 from tqdm.auto import tqdm
 
 from seqtante_open.experiments.fit import FittingClass
@@ -42,12 +44,12 @@ from seqtante_open.experiments.plotting import (
     get_xarray_from_meas,
 )
 from seqtante_open.experiments.analysis import rotate_iq
-from seqtante_open.experiments.analysis import lorentzian
+from seqtante_open.experiments.fit.utils import find_peaks_poly, sinus
 
 
-class QubitSpectroscopyFit:
+class RabiFit:
     """Handle the correction of the data and fitting
-    of Qubit Spectroscopy data.
+    of Rabi data.
     """
 
     def __init__(
@@ -68,45 +70,88 @@ class QubitSpectroscopyFit:
         self.measurement = measurement
         self.loop = loop
         self.path = path
-        self.qubit_freq = None
+        self.drive_amp = None
 
-    def _find_qubit_freq(self,
+    def _find_drive_amp(self,
                         data: np.ndarray,
                         x_vals: np.ndarray,
                         ):
-        """Find qubit frequency in a 2D array"""
-        if_sweep = self.loop["frequency"]["array"]
-        flux_sweep = self.loop["flux"]["array"]
-        fitted_ifs = np.empty((len(flux_sweep)))
-        r_squareds = np.empty((len(flux_sweep)))
-        i = data[:,:,0]
-        q = data[:,:,1]
+        """Find drive amplitude in a 1D array"""
+        amp_sweep = self.loop["amplitude"]["array"]
+        i = data[:,0]
+        q = data[:,1]
         rotated_signal = rotate_iq(i + 1j * q)
         signal = np.real(rotated_signal)
         
-        fit_values = np.empty((len(x_vals), len(if_sweep)))
-        fitted_ifs = np.empty((len(x_vals)))
-        r_squareds = np.empty((len(x_vals)))
-        mask_i = np.empty(len(x_vals), dtype=bool)
+        # Poly fit
+        z = np.polyfit(amp_sweep, signal, 8)
+        p = np.poly1d(z)
+        fit_poly = p(amp_sweep)
 
+        # Sinus fit
+        mod = lmfit.Model(sinus)
 
-        for ii in range(len(x_vals)):
-            i_fitted_if, i_fitvals, i_rsquared = lorentzian(np.real(signal[ii]), if_sweep)
+        tt = np.array(amp_sweep)
+        yy = np.array(signal)
+        ff = np.fft.fftfreq(len(tt), (tt[1] - tt[0])) * 2 * np.pi  # assume uniform spacing
+        Fyy = abs(np.fft.fft(yy))
+        guess_freq = abs(ff[np.argmax(Fyy[1:]) + 1])  # excluding the zero frequency "peak", which is related to offset
+        guess_amp = np.std(yy) * 2.0**0.5
+        guess_offset = np.mean(yy)
 
-            if i_rsquared < 0.60:
-                i_fitted_if = np.nan
-                mask_i[ii] = False
-            else:
-                mask_i[ii] = True
-            
-            fitted_ifs[ii] = i_fitted_if
-            fit_values[ii] = i_fitvals
-            r_squareds[ii] = i_rsquared
+        # Set initial parameter values
+        mod.set_param_hint("a", value=guess_amp)
+        mod.set_param_hint("b", value=guess_freq)
+        mod.set_param_hint("c", value=0)
+        mod.set_param_hint("d", value=guess_offset)
 
-        i_coeffs = np.polyfit(flux_sweep[mask_i], fitted_ifs[:][mask_i], 2)
-        i_sweetspot = -i_coeffs[1]/(2*i_coeffs[0])
+        params = mod.make_params()
+        fit = mod.fit(data=signal, params=params, x=amp_sweep, method="basinhopping")
+        
+        a_value = fit.params["a"].value
+        b_value = fit.params["b"].value
+        c_value = fit.params["c"].value
+        d_value = fit.params["d"].value
 
-        return i_sweetspot
+        popt = [a_value, b_value, c_value, d_value]
+
+        # T/8 with T as the sweep interval
+        peak_threshold = amp_sweep[0] + np.abs((amp_sweep[-1] - amp_sweep[0]) / 12)
+
+        fit_sinus = sinus(amp_sweep, *popt)
+        peaks_max_sinus, _ = find_peaks(fit_sinus)
+        peaks_min_sinus, _ = find_peaks(-fit_sinus)
+
+        all_peaks_indices_sinus = np.concatenate([peaks_max_sinus, peaks_min_sinus])
+        all_peaks_indices_sinus.sort()
+
+        all_peaks_indices_poly = find_peaks_poly(fit_poly)
+
+        peak_sinus = amp_sweep[all_peaks_indices_sinus[0]] if len(all_peaks_indices_sinus) != 0 else amp_sweep[-1]
+        peak_2_sinus = min((peak_sinus + np.abs(1 / (popt[1]))), amp_sweep[-1])
+
+        peak_poly = amp_sweep[all_peaks_indices_poly[0]] if len(all_peaks_indices_poly) != 0 else amp_sweep[-1]
+        peak_2_poly = amp_sweep[all_peaks_indices_poly[1]] if len(all_peaks_indices_poly) > 1 else amp_sweep[-1]
+
+        fitted_pi_pulse_amplitude_sinus = peak_sinus if peak_sinus >= peak_threshold else peak_2_sinus
+        fitted_pi_pulse_amplitude_poly = peak_poly if peak_poly >= peak_threshold else peak_2_poly
+
+        r2_poly = r2_score(signal, fit_poly)
+        r2_sinus = r2_score(signal, fit_sinus)
+
+        if r2_poly > r2_sinus:
+            chosen_fit = "poly"
+        else:
+            chosen_fit = "sinus"
+
+        fits = {
+            "poly": [fitted_pi_pulse_amplitude_poly, fit_poly, r2_poly],
+            "sinus": [fitted_pi_pulse_amplitude_sinus, fit_sinus, r2_sinus],
+        }
+
+        pi_amp = fits[chosen_fit][0]
+
+        return pi_amp
 
     def fit(self):
         """Empty placeholder for now"""
@@ -126,7 +171,7 @@ class QubitSpectroscopyFit:
         data = xarr.transpose(..., axis_name).to_numpy()
         x_vals = xarr[axis_name].to_numpy()
 
-        self.qubit_if = self._find_qubit_freq(
+        self.drive_amp = self._find_drive_amp(
             data=data,
             x_vals=x_vals,
         )
