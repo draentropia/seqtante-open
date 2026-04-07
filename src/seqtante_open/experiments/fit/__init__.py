@@ -15,6 +15,7 @@
 from .fit_base import FittingClass
 from .qubit_fit import QubitSpectroscopyFit
 from .resonator_fit import ResonatorSpectroscopyFit
+from .t1_fit import T1Fit
 from .utils import cosfunc, cosine, decaying_exponential, find_peaks_poly, sinus
 
 __all__ = [

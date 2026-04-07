@@ -17,7 +17,7 @@ import tqdm
 from qililab import Platform
 from qililab.result import StreamArray
 
-from seqtante_open.experiments.fit import RabiFit
+from seqtante_open.experiments.fit import T1Fit
 from seqtante_open.experiments.qprogram import t1_single_square
 from seqtante_open.experiments.utils import from_parameters_to_calibration, set_all_flux_channels_to_zero
 from seqtante_open.outputs import output_controller
